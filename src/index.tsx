@@ -1,11 +1,9 @@
 import React from "react";
-import ReactDOM from "react-dom";
+import ReactDOM from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "react-query";
 import { RecoilRoot } from "recoil";
-import { ThemeProvider } from "styled-components";
+import { createGlobalStyle, ThemeProvider } from "styled-components";
 import App from "./App";
-import { createGlobalStyle } from "styled-components";
-import "./App.css";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { theme } from "./theme";
 
 const GlobalStyle = createGlobalStyle`
@@ -40,7 +38,6 @@ footer, header, hgroup, main, menu, nav, section {
 }
 body {
   line-height: 1;
-  overflow-x: hidden;
 }
 menu, ol, ul {
   list-style: none;
@@ -62,28 +59,32 @@ table {
 }
 body {
   font-weight: 300;
-  font-family: 'Source Sans Pro', sans-serif;
-  color:${(props) => props.theme.white.darker};
+  font-family: 'Roboto','Noto Sans KR', sans-serif;
+  color: ${(props) => props.theme.white.darker};
   line-height: 1.2;
-  background-color: ${(props) => props.theme.black.veryDark};
+  background-color: ${(props) => props.theme.black.veryDark};  
 }
 a {
   text-decoration:none;
   color:inherit;
 }
+::-webkit-scrollbar {
+display: none;
+}
 `;
+
 const client = new QueryClient();
 
-ReactDOM.render(
-  <React.StrictMode>
-    <RecoilRoot>
-      <QueryClientProvider client={client}>
-        <ThemeProvider theme={theme}>
-          <GlobalStyle />
-          <App />
-        </ThemeProvider>
-      </QueryClientProvider>
-    </RecoilRoot>
-  </React.StrictMode>,
-  document.getElementById("root")
+const root = ReactDOM.createRoot(
+  document.getElementById("root") as HTMLElement
+);
+root.render(
+  <RecoilRoot>
+    <QueryClientProvider client={client}>
+      <ThemeProvider theme={theme}>
+        <GlobalStyle />
+        <App />
+      </ThemeProvider>
+    </QueryClientProvider>
+  </RecoilRoot>
 );

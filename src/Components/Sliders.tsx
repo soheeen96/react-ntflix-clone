@@ -1,55 +1,46 @@
-import styled from "styled-components";
-import { useNavigate, useMatch, PathMatch } from "react-router-dom";
-import { motion, AnimatePresence, useScroll } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useSetRecoilState } from "recoil";
+import styled from "styled-components";
+import { IMovie } from "../api";
+import {
+  clickedMovieState,
+  clickedSearchState,
+  clickedTvState,
+} from "../atoms";
 import { makeImagePath } from "../utils";
-import { IGetMoviesResult } from "../api";
-import { useQuery } from "@tanstack/react-query";
+import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 
-const Slider = styled.div`
+const RowContainer = styled.div`
+  height: 200px;
   position: relative;
-  margin-bottom: 80px;
 `;
 
-const SliderTitle = styled.h2`
-  font-size: 28px;
+const RowTitle = styled.h2`
+  padding: 10px 0;
+  font-size: 24px;
   font-weight: 600;
-  margin-bottom: 16px;
 `;
 
 const Row = styled(motion.div)`
-  display: grid;
-  gap: 15px;
-  grid-template-columns: repeat(6, 1fr);
-  width: 100%;
-  height: 200px;
-`;
-
-const Btn = styled.button`
-  width: 40px;
-  height: 40px;
   position: absolute;
-  top: 50%;
-  left: -40px;
-  transform: translate(-50%, -50%);
-  color: ${(props) => props.theme.white.lighter};
-  background: none;
-  border: 0;
-  font-size: 22px;
-  cursor: pointer;
-  &:last-child {
-    left: auto;
-    right: -40px;
-    transform: translate(50%, -50%);
-  }
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  width: 100%;
+  height: 100%;
 `;
 
+// motion.div 등 motion을 사용할 때는 뒤에다가 prop을 정의해줌!!!
 const Box = styled(motion.div)<{ bgphoto: string }>`
-  background: url(${(props) => props.bgphoto}) no-repeat center / cover;
+  background-image: url(${(props) => props.bgphoto});
+  background-size: cover;
+  background-position: center center;
+  width: 100%;
   height: 100%;
-  position: relative;
+  font-size: 66px;
   cursor: pointer;
-
   &:first-child {
     transform-origin: center left;
   }
@@ -59,193 +50,145 @@ const Box = styled(motion.div)<{ bgphoto: string }>`
 `;
 
 const Info = styled(motion.div)`
-  padding: 10px;
-  background-color: ${(props) => props.theme.black.veryDark};
-  opacity: 0;
   position: absolute;
+  padding: 10px;
   width: 100%;
+  opacity: 0;
+  background-color: ${(props) => props.theme.black.lighter};
   bottom: 0;
-  transform: translateY(100%);
   h4 {
     text-align: center;
     font-size: 18px;
   }
 `;
 
-const Overlay = styled(motion.div)`
-  position: fixed;
-  top: 0;
-  left: 0;
+const Buttons = styled(motion.div)`
+  position: absolute;
+  top: 50%;
   width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  opacity: 0;
-  z-index: 20;
+  transform: translateY(-50%);
 `;
 
-const BigMovie = styled(motion.div)<{ scrolly: number }>`
-  position: fixed;
-  width: min(600px, 40vw);
-  height: 80vh;
-  top: 10vh;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  margin: 0 auto;
-  border-radius: 15px;
-  overflow: hidden;
-  background-color: ${(props) => props.theme.black.darker};
-  z-index: 30;
-`;
-
-const BigCover = styled.div`
-  width: 100%;
-  background-size: cover;
-  background-position: center center;
-  height: 400px;
-  display: flex;
-  flex-flow: row wrap;
-  align-items: flex-end;
-  h3 {
-    padding: min(20px, 4%);
-    font-size: 36px;
-    font-weight: 700;
-    color: ${(props) => props.theme.white.lighter};
+const Button = styled(motion.span)`
+  font-size: 40px;
+  color: white;
+  cursor: pointer;
+  z-index: 1;
+  position: absolute;
+  transform: translateX(-50%);
+  left: -2%;
+  &:last-child {
+    left: auto;
+    transform: translateX(50%);
+    right: -2%;
   }
 `;
 
-const BigOverview = styled.div`
-  padding: min(20px, 4%);
-  font-size: 18px;
-  color: ${(props) => props.theme.white.lighter};
-`;
+const RowVariants = {
+  initial: (direction: number) => ({
+    x: direction > 0 ? window.outerWidth + 5 : -window.outerWidth - 5,
+  }),
+  animate: { x: 0 },
+  exit: (direction: number) => ({
+    x: direction < 0 ? window.outerWidth + 5 : -window.outerWidth - 5,
+  }),
+};
 
-const boxVariants = {
+const BoxVariants = {
   normal: {
     scale: 1,
   },
   hover: {
-    scale: 1.3,
-    zIndex: 4,
-    boxShadow: "0 5px 10px 3px #00000080",
-    transition: {
-      delay: 0.4,
-      duaration: 0.3,
-      type: "tween",
-    },
+    scale: 1.5,
+    y: -100,
+    transition: { delay: 0.3, type: "tween", duration: 0.3 },
   },
 };
+
 const infoVariants = {
   hover: {
     opacity: 1,
-    transition: {
-      delay: 0.5,
-      duaration: 0.1,
-      type: "tween",
-    },
+    transition: { delay: 0.3, type: "tween", duration: 0.3 },
   },
 };
 
-const rowVariants = {
-  hidden: (reverse: number) => ({
-    x: reverse > 0 ? -window.outerWidth : window.outerWidth,
-  }),
-  visible: { x: 0 },
-  exit: (reverse: number) => ({
-    x: reverse > 0 ? window.outerWidth : -window.outerWidth,
-  }),
-};
-
-interface ISliders {
-  page: string;
+interface ISliderProps {
   title: string;
-  category: string;
-  data: IGetMoviesResult | undefined;
+  sliderId: string;
+  mediaType: string;
+  contents: IMovie[];
 }
 
 const offset = 6;
 
-function Sliders({ page, title, category, data }: ISliders) {
-  //슬라이드 클릭하면 url 개별id로 변경
+function Slider({ title, sliderId, mediaType, contents }: ISliderProps) {
   const navigate = useNavigate();
-  const onBoxClicked = (movieId: number) => {
-    navigate(`/${page}/${movieId}`);
-  };
 
-  //슬라이드 버튼
+  const setClickedMovie = useSetRecoilState(clickedMovieState);
+  const setClickedTv = useSetRecoilState(clickedTvState);
+  const setClickedSearch = useSetRecoilState(clickedSearchState);
+
   const [index, setIndex] = useState(0);
+  const [[page, direction], setPage] = useState([0, 0]);
   const [leaving, setLeaving] = useState(false);
-  const [reverse, setReverse] = useState(0);
-  const toggleLeaving = () => setLeaving((prev) => !prev);
-  const decreaseIndex = () => {
-    setReverse(1);
-    if (data) {
+  const increaseIndex = (newDirection: number) => {
+    if (contents) {
       if (leaving) return;
       toggleLeaving();
-      const totalMovies = data?.results.length - 1;
-      const maxIndex = Math.floor(totalMovies / offset) - 1;
-      setIndex((prev) => (prev === 0 ? maxIndex : prev - 1));
-    }
-  };
-  const increaseIndex = () => {
-    setReverse(-1);
-    if (data) {
-      if (leaving) return;
-      toggleLeaving();
-      const totalMovies = data?.results.length - 1;
+      setPage([page + newDirection, newDirection]);
+      const totalMovies = contents.length;
       const maxIndex = Math.floor(totalMovies / offset) - 1;
       setIndex((prev) => (prev === maxIndex ? 0 : prev + 1));
     }
   };
+  const toggleLeaving = () => setLeaving((prev) => !prev);
+  const onBoxClicked = (movie: IMovie, movieId: number) => {
+    if (mediaType === "movie") {
+      setClickedMovie(movie);
+      navigate(`/movies/${movieId}`);
+    } else if (mediaType === "tv") {
+      setClickedTv(movie);
+      navigate(`/tv/${movieId}`);
+    } else {
+      setClickedSearch(movie);
+      navigate(`/search/${movieId}`);
+    }
+  };
 
-  const { scrollY } = useScroll();
-
-  const bigMovieMatch: PathMatch<string> | null = useMatch(`/${page}/:id`);
-
-  const clickedMovie =
-    bigMovieMatch?.params.id &&
-    data?.results.find((movie) => movie.id + "" === bigMovieMatch.params.id);
-
-  console.log(clickedMovie);
-
-  //오버레이 영역 클릭하면 뒤로가기
-  const onOverlayClick = () => navigate(-1);
   return (
     <>
-      <Slider>
-        <Btn onClick={decreaseIndex}>&lt;</Btn>
-
-        <AnimatePresence
-          initial={false}
-          onExitComplete={toggleLeaving}
-          custom={reverse}
-        >
-          <SliderTitle>{title}</SliderTitle>
+      <RowTitle>{title}</RowTitle>
+      <RowContainer>
+        <Buttons>
+          <Button whileHover={{ scale: 1.3 }} onClick={() => increaseIndex(-1)}>
+            <FaChevronLeft />
+          </Button>
+          <Button whileHover={{ scale: 1.3 }} onClick={() => increaseIndex(1)}>
+            <FaChevronRight />
+          </Button>
+        </Buttons>
+        <AnimatePresence initial={false} onExitComplete={toggleLeaving}>
           <Row
-            variants={rowVariants}
-            initial="hidden"
-            animate="visible"
+            variants={RowVariants}
+            initial="initial"
+            animate="animate"
             exit="exit"
+            custom={direction}
             transition={{ type: "tween", duration: 1 }}
-            key={index}
-            custom={reverse}
+            key={page}
           >
-            {data?.results
-              .slice(1)
+            {contents
               .slice(offset * index, offset * index + offset)
               .map((movie) => (
                 <Box
-                  layoutId={category + movie.id + ""}
+                  layoutId={sliderId + movie.id + ""}
                   key={movie.id}
-                  variants={boxVariants}
-                  whileHover="hover"
+                  onClick={() => onBoxClicked(movie, movie.id)}
+                  variants={BoxVariants}
                   initial="normal"
+                  whileHover="hover"
                   transition={{ type: "tween" }}
-                  onClick={() => onBoxClicked(movie.id)}
-                  bgphoto={makeImagePath(
-                    movie.backdrop_path || movie.poster_path,
-                    "w500"
-                  )}
+                  bgphoto={makeImagePath(movie.backdrop_path!, "w500")}
                 >
                   <Info variants={infoVariants}>
                     <h4>{movie.title}</h4>
@@ -254,48 +197,9 @@ function Sliders({ page, title, category, data }: ISliders) {
               ))}
           </Row>
         </AnimatePresence>
-        <Btn onClick={increaseIndex}>&gt;</Btn>
-      </Slider>
-      <AnimatePresence>
-        {bigMovieMatch ? (
-          <>
-            <Overlay
-              onClick={onOverlayClick}
-              exit={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            />
-
-            <BigMovie
-              scrolly={scrollY.get()}
-              layoutId={bigMovieMatch.params.id}
-            >
-              {clickedMovie && (
-                <>
-                  <BigCover
-                    style={{
-                      backgroundImage: `linear-gradient(to top, #181818, transparent), url(${makeImagePath(
-                        clickedMovie.backdrop_path,
-                        "w500"
-                      )})`,
-                    }}
-                  >
-                    <h3>{clickedMovie.title}</h3>
-                  </BigCover>
-
-                  <BigOverview>
-                    <div>
-                      <h4>{clickedMovie.release_date}</h4>
-                      <h4>{clickedMovie.vote_average}</h4>
-                    </div>
-                    <p>{clickedMovie.overview}</p>
-                  </BigOverview>
-                </>
-              )}
-            </BigMovie>
-          </>
-        ) : null}
-      </AnimatePresence>
+      </RowContainer>
     </>
   );
 }
-export default Sliders;
+
+export default Slider;
